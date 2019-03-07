@@ -3,14 +3,15 @@
 #Ran into some replication issues with the groups not existing yet if talking to a random domain controller
 #This way we get the name of the Primary Domain Controller and all future steps with AD are done through 
 #the same domain controller so we don't need to worry about replication.
-- name: Get the name of the Primary Domain Controller
-  block:
-    - win_shell:
+- block:
+    - name: Get the name of the Primary Domain Controller
+      win_shell:
         Get-AdDomainController -discover -domain "{{ ad_domain }}" -service "PrimaryDC" | ConvertTo-JSON
       register: json_response
       changed_when: false
 
-    - set_fact:
+    - name: Set name of the Primary Domain Controller as a fact
+      set_fact:
         domain_controller: "{{ json_response.stdout | from_json }}"
   when: domain_controller is not defined
 
@@ -80,7 +81,7 @@
   with_items:
     - "{{ ad_group_membership_users }}"
   #Only add users to the group if the group state is present and the ad_group_membership_users list has at least one entry
-  when: ad_group_state | lower == "present" and ad_group_membership_users.0 is defined
+  when: ad_group_state | lower == "present" and ad_group_membership_users | length > 0
 
 - name: Add groups to group {{ ad_group_name }}  
   win_shell: |
@@ -106,4 +107,4 @@
   with_items:
     - "{{ ad_group_membership_groups }}"
   #Only add groups to the group if the group state is present and the ad_group_membership_groups list has at least one entry
-  when: ad_group_state | lower == "present" and ad_group_membership_groups.0 is defined
+  when: ad_group_state | lower == "present" and ad_group_membership_groups | length > 0
