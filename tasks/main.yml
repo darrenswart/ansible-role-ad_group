@@ -66,13 +66,13 @@
       Write-Host "Unable to locate a user with a UserPrincipalName of {{ item }} in the Active Directory Forest."
       exit 1
     }
-    $group_members = Get-ADGroup -Identity "CN={{ ad_group_name}},{{ ad_group_ou}}" -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}" -Properties member
+    $group_members = Get-ADGroup -Identity "CN={{ ad_group_name }},{{ ad_group_ou }}" -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}" -Properties member
     If ($group_members.member -Contains $result.Properties.distinguishedname[0]) {
       #user is already a member of the group
-      Write-Host "User {{ item }} is already a member of the group {{ ad_group_name}}"
+      Write-Host "User {{ item }} is already a member of the group {{ ad_group_name }}"
     } else {
       $user = Get-ADUser -Identity $result.Properties.distinguishedname[0] -Server $domain -Credential $credential
-      Add-ADGroupMember -Identity "CN={{ ad_group_name}},{{ ad_group_ou}}" -Members $user -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}"
+      Add-ADGroupMember -Identity "CN={{ ad_group_name }},{{ ad_group_ou }}" -Members $user -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}"
     }
   args: 
     stdin: "{{ domain_password }}"
@@ -92,13 +92,13 @@
     $domain_password = ([Console]::In.ReadToEnd()).Trim() #Set the contents of stdin to $domain password
     $domain_password = ConvertTo-SecureString "$domain_password" -AsPlainText -Force
     $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList "{{ domain_username }}", $domain_password
-    $group_members = Get-ADGroup -Identity "CN={{ ad_group_name}},{{ ad_group_ou}}" -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}" -Properties member
+    $group_members = Get-ADGroup -Identity "CN={{ ad_group_name }},{{ ad_group_ou }}" -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}" -Properties member
     If ($group_members.member -Contains "{{ item }}") {
       #group is already a member of the group
-      Write-Host "Group {{ item }} is already a member of the group {{ ad_group_name}}"
+      Write-Host "Group {{ item }} is already a member of the group {{ ad_group_name }}"
     } else {
       $group = Get-ADGroup -Identity "{{ item }}" -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}"
-      Add-ADGroupMember -Identity "CN={{ ad_group_name}},{{ ad_group_ou}}" -Members $group -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}"
+      Add-ADGroupMember -Identity "CN={{ ad_group_name }},{{ ad_group_ou }}" -Members $group -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}"
     }
   args: 
     stdin: "{{ domain_password }}"
