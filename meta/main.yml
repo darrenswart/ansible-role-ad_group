@@ -1,5 +1,6 @@
 galaxy_info:
   role_name: ad_group
+  description: Creation of Active Directory groups as well as group membership
   author: Darren Swart
   license: GPLv3
 
