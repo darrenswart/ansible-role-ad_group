@@ -1,0 +1,21 @@
+galaxy_info:
+  role_name: ad_group
+  author: Darren Swart
+  license: GPLv3
+
+  min_ansible_version: 2.4
+
+  platforms:
+   - name: Windows
+  
+  galaxy_tags: 
+    - ad
+    - activedirectory
+    - domain
+    - domainusers
+    - domaingroups
+    - windows
+
+dependencies: []
+  # List your role dependencies here, one per line. Be sure to remove the '[]' above,
+  # if you add dependencies to this list.

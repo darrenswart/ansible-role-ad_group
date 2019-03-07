@@ -1,0 +1,7 @@
+---
+# defaults file for ad_group
+ad_group_state: present
+domain_username: "{{ ansible_user }}"
+domain_password: "{{ ansible_password }}"
+ad_group_membership_users: []
+ad_group_membership_groups: []

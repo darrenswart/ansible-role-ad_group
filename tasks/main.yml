@@ -1,0 +1,109 @@
+---
+# tasks file for ad_group
+#Ran into some replication issues with the groups not existing yet if talking to a random domain controller
+#This way we get the name of the Primary Domain Controller and all future steps with AD are done through 
+#the same domain controller so we don't need to worry about replication.
+- name: Get the name of the Primary Domain Controller
+  block:
+    - win_shell:
+        Get-AdDomainController -discover -domain "{{ ad_domain }}" -service "PrimaryDC" | ConvertTo-JSON
+      register: json_response
+      changed_when: false
+
+    - set_fact:
+        domain_controller: "{{ json_response.stdout | from_json }}"
+  when: domain_controller is not defined
+
+- name: Print the name of the Primary Domain Controller
+  debug:
+    msg: "All Active Directory commands will be issued to the domain controller {{ domain_controller.Name }}"
+
+- name: Create the group {{ ad_group_name }} at {{ ad_group_ou }}
+  win_domain_group:
+    description: "{{ ad_group_description }}"
+    domain_server: "{{ domain_controller.Name }}.{{ ad_domain }}"
+    domain_username: "{{ domain_username }}"
+    domain_password: "{{ domain_password }}"
+    name: "{{ ad_group_name }}"
+    scope: universal
+    path: "{{ ad_group_ou }}"
+    state: "{{ ad_group_state }}"
+
+#The Ansible module win_domain_group does not support adding users to a group.  Instead we search for the AD user object based on
+#their UserPrincipalName (UPN) which is usually their email address.  Once the user object is found we add that user to the group.
+#Since we are adding users from different domains than what the group is in we need to get the user oject using the cmdlet Get-ADUser.
+#This appears to be the only supported method for adding users to a group in a different domain.
+- name: Add users to group {{ ad_group_name }}  
+  win_shell: |
+    #Due to the way winrm and some of the powershell cmdlets for AD work kerberos credential delegation (or kerberos double hop) is needed
+    #Unfortunately this didn't seem to work through ansible when using winrm and kerberos
+    #As a result, credentials are passed to all AD commands.  Additionally, some cmdlets wouldn't work so other ones had to be chosen.  For
+    #example Get-ADGroupMember seems to need kerberos credential delegation to work when a multi domain forest exists 
+    $domain_password = ([Console]::In.ReadToEnd()).Trim() #Set the contents of stdin to $domain password
+    $domain_password = ConvertTo-SecureString "$domain_password" -AsPlainText -Force
+    $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList "{{ domain_username }}", $domain_password
+    #Get a list of domains in the forest so we can search them all to find which domain the user is in
+    $domainlist = Get-ADForest -Identity {{ ad_domain }} -Credential $credential
+    foreach ($domain in $domainlist.Domains) {
+      $search = New-Object -TypeName System.DirectoryServices.DirectorySearcher
+      $search.Filter = "(&(objectCategory=Person)(UserPrincipalName={{ item }}))"
+      #Convert domain to Distinguished Name
+      $domainDN = 'LDAP://DC=' + $domain.replace('.',',DC=')
+      #Create domain search object that includes the credentials needed to search AD
+      $domainSearch = New-Object -TypeName System.DirectoryServices.DirectoryEntry -ArgumentList $domainDN ,$($credential.UserName),$($credential.GetNetworkCredential().password)
+      $search.SearchRoot = $domainSearch
+      $result = $search.FindAll()
+      if (-Not ([string]::IsNullOrEmpty($result))) {
+        #If a matching user is found break out of the for loop
+        break
+      }
+    }
+    if (-Not ([string]::IsNullOrEmpty($result))) {
+      #The Distinguished Name is located at $result.Properties.distinguishedname[0] or $result.Properties["distinguishedname"]
+      #$result | ConvertTo-JSON
+    } else {
+      Write-Host "Unable to locate a user with a UserPrincipalName of {{ item }} in the Active Directory Forest."
+      exit 1
+    }
+    $group_members = Get-ADGroup -Identity "CN={{ ad_group_name}},{{ ad_group_ou}}" -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}" -Properties member
+    If ($group_members.member -Contains $result.Properties.distinguishedname[0]) {
+      #user is already a member of the group
+      Write-Host "User {{ item }} is already a member of the group {{ ad_group_name}}"
+    } else {
+      $user = Get-ADUser -Identity $result.Properties.distinguishedname[0] -Server $domain -Credential $credential
+      Add-ADGroupMember -Identity "CN={{ ad_group_name}},{{ ad_group_ou}}" -Members $user -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}"
+    }
+  args: 
+    stdin: "{{ domain_password }}"
+  register: result
+  changed_when: "'already a member' not in result.stdout" 
+  with_items:
+    - "{{ ad_group_membership_users }}"
+  #Only add users to the group if the group state is present and the ad_group_membership_users list has at least one entry
+  when: ad_group_state | lower == "present" and ad_group_membership_users.0 is defined
+
+- name: Add groups to group {{ ad_group_name }}  
+  win_shell: |
+    #Due to the way winrm and some of the powershell cmdlets for AD work kerberos credential delegation (or kerberos double hop) is needed
+    #Unfortunately this didn't seem to work through ansible when using winrm and kerberos
+    #As a result, credentials are passed to all AD commands.  Additionally, some cmdlets wouldn't work so other ones had to be chosen.  For
+    #example Get-ADGroupMember seems to need kerberos credential delegation to work when a multi domain forest exists 
+    $domain_password = ([Console]::In.ReadToEnd()).Trim() #Set the contents of stdin to $domain password
+    $domain_password = ConvertTo-SecureString "$domain_password" -AsPlainText -Force
+    $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList "{{ domain_username }}", $domain_password
+    $group_members = Get-ADGroup -Identity "CN={{ ad_group_name}},{{ ad_group_ou}}" -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}" -Properties member
+    If ($group_members.member -Contains "{{ item }}") {
+      #group is already a member of the group
+      Write-Host "Group {{ item }} is already a member of the group {{ ad_group_name}}"
+    } else {
+      $group = Get-ADGroup -Identity "{{ item }}" -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}"
+      Add-ADGroupMember -Identity "CN={{ ad_group_name}},{{ ad_group_ou}}" -Members $group -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}"
+    }
+  args: 
+    stdin: "{{ domain_password }}"
+  register: result
+  changed_when: "'already a member' not in result.stdout" 
+  with_items:
+    - "{{ ad_group_membership_groups }}"
+  #Only add groups to the group if the group state is present and the ad_group_membership_groups list has at least one entry
+  when: ad_group_state | lower == "present" and ad_group_membership_groups.0 is defined
