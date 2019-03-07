@@ -8,8 +8,8 @@ galaxy_info:
 
   platforms:
    - name: Windows
-  
-  galaxy_tags: 
+
+  galaxy_tags:
     - ad
     - activedirectory
     - domain

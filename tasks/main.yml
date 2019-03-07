@@ -74,16 +74,16 @@
       $user = Get-ADUser -Identity $result.Properties.distinguishedname[0] -Server $domain -Credential $credential
       Add-ADGroupMember -Identity "CN={{ ad_group_name }},{{ ad_group_ou }}" -Members $user -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}"
     }
-  args: 
+  args:
     stdin: "{{ domain_password }}"
   register: result
-  changed_when: "'already a member' not in result.stdout" 
+  changed_when: "'already a member' not in result.stdout"
   with_items:
     - "{{ ad_group_membership_users }}"
   #Only add users to the group if the group state is present and the ad_group_membership_users list has at least one entry
   when: ad_group_state | lower == "present" and ad_group_membership_users | length > 0
 
-- name: Add groups to group {{ ad_group_name }}  
+- name: Add groups to group {{ ad_group_name }}
   win_shell: |
     #Due to the way winrm and some of the powershell cmdlets for AD work kerberos credential delegation (or kerberos double hop) is needed
     #Unfortunately this didn't seem to work through ansible when using winrm and kerberos
@@ -100,10 +100,10 @@
       $group = Get-ADGroup -Identity "{{ item }}" -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}"
       Add-ADGroupMember -Identity "CN={{ ad_group_name }},{{ ad_group_ou }}" -Members $group -Credential $credential -Server "{{ domain_controller.Name }}.{{ ad_domain }}"
     }
-  args: 
+  args:
     stdin: "{{ domain_password }}"
   register: result
-  changed_when: "'already a member' not in result.stdout" 
+  changed_when: "'already a member' not in result.stdout"
   with_items:
     - "{{ ad_group_membership_groups }}"
   #Only add groups to the group if the group state is present and the ad_group_membership_groups list has at least one entry
