@@ -43,6 +43,9 @@ Example Playbook
       ad_group_membership_users: ['emmett.brown@fluxcapacitor.com', 'marty.mcfly@fluxcapacitor.com']
 ```
 
+**NOTE**
+Due to the time it can take for replication to occur in Active Directory the role sets the fact (variable) `domain_controller` that is available after the role executes.  It is recommended to use this value in your playbook if wanting to interact with the newly created group in some way.  Since it can't be guaranteed that the group will be fully replicated throughout the domain but the time the role completes.
+
 License
 -------
 
