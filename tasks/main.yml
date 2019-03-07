@@ -34,7 +34,7 @@
 #their UserPrincipalName (UPN) which is usually their email address.  Once the user object is found we add that user to the group.
 #Since we are adding users from different domains than what the group is in we need to get the user oject using the cmdlet Get-ADUser.
 #This appears to be the only supported method for adding users to a group in a different domain.
-- name: Add users to group {{ ad_group_name }}  
+- name: Add users to group {{ ad_group_name }}
   win_shell: |
     #Due to the way winrm and some of the powershell cmdlets for AD work kerberos credential delegation (or kerberos double hop) is needed
     #Unfortunately this didn't seem to work through ansible when using winrm and kerberos
